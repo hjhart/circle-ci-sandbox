@@ -1,0 +1,73 @@
+version: 2.1
+
+orbs:
+  slack: circleci/slack@2.5.1
+
+executors:
+  codepush_executor:
+    working_directory: ~/voom/mobile/ios
+    shell: /bin/bash --login -o pipefail
+    docker:
+      - image: circleci/node:10
+
+commands:
+  notify_slack_if_deploy_succeeded:
+    description: Notify people of successful deploys
+    parameters:
+      environment:
+        description: Which environment is being deployed to
+        type: string
+        default: unspecified_environment
+      git_deploy_sha_begin:
+        description: Begin git sha
+        type: string
+      git_deploy_sha_end:
+        description: End git sha
+        type: string
+      git_deployed_diff:
+        description: Git diff for deploy
+        type: string
+    steps:
+      - slack/status:
+          success_message: ":chipmunk: Successfully deployed << parameters.environment >> <https://github.com/voomflights/ponton/compare/<< parameters.git_deploy_sha_begin >>...<< parameters.git_deploy_sha_end >>|view diff on github>\n\n```<< parameters.git_deployed_diff >>```"
+          failure_message: ":red_circle: Deploy failed to << parameters.environment >>"
+          include_project_field: false
+          include_job_number_field: false
+
+jobs:
+  hydrate_bash_environment:
+    parallelism: 1
+    executor: codepush_executor
+    steps:
+      - checkout:
+          path: ~/voom
+
+      - deploy:
+          name: Deploy to Heroku
+          command: bin/hydrate_bash_environment
+
+  slack_notification:
+    parallelism: 1
+    executor: codepush_executor
+    steps:
+      - notify_slack_if_deploy_succeeded:
+          environment: "staging"
+          git_deploy_sha_begin: $GIT_DEPLOY_SHA_BEGIN
+          git_deploy_sha_end: $GIT_DEPLOY_SHA_END
+          git_deployed_diff: $GIT_DEPLOYED_DIFF
+
+workflows:
+  voom:
+    jobs:
+      - hydrate_bash_environment:
+          filters:
+            branches:
+              only:
+                - master
+      - slack_notification:
+          requires:
+            - hydrate_bash_environment
+          filters:
+            branches:
+              only:
+                - master
