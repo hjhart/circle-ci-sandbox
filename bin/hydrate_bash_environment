@@ -1,0 +1,7 @@
+
+echo 'export GIT_ATTRIBUTION=git_attribute' >> $BASH_ENV
+echo "export GIT_DEPLOY_SHA_BEGIN='WHATUP!'" >> $BASH_ENV
+echo "export GIT_DEPLOY_SHA_END='HI'" >> $BASH_ENV
+echo "export GIT_DEPLOYED_DIFF='one line
+two line
+three line'" >> $BASH_ENV

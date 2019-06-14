@@ -5,7 +5,7 @@ orbs:
 
 executors:
   codepush_executor:
-    working_directory: ~/voom/mobile/ios
+    working_directory: ~/voom
     shell: /bin/bash --login -o pipefail
     docker:
       - image: circleci/node:10
@@ -28,11 +28,10 @@ commands:
         description: Git diff for deploy
         type: string
     steps:
-      - slack/status:
-          success_message: ":chipmunk: Successfully deployed << parameters.environment >> <https://github.com/voomflights/ponton/compare/<< parameters.git_deploy_sha_begin >>...<< parameters.git_deploy_sha_end >>|view diff on github>\n\n```<< parameters.git_deployed_diff >>```"
-          failure_message: ":red_circle: Deploy failed to << parameters.environment >>"
-          include_project_field: false
-          include_job_number_field: false
+      - run:
+          description: "show stuff"
+          command: |
+            echo "<< parameters.environment >> <https://github.com/voomflights/ponton/compare/$(echo << parameters.git_deploy_sha_begin >>)...$(echo $GIT_DEPLOY_SHA_END) $(echo $GIT_DEPLOYED_DIFF)"
 
 jobs:
   hydrate_bash_environment:
@@ -44,17 +43,33 @@ jobs:
 
       - deploy:
           name: Deploy to Heroku
-          command: bin/hydrate_bash_environment
+          command: ./bin/hydrate_bash_environment
+
+      - run: echo 'export OTHER_JOB=probablY_not' >> $BASH_ENV
+      - run: echo $BASH_ENV
+      - run: cat $BASH_ENV > /var/tmp/bash_env
+      - persist_to_workspace:
+          root: /var/tmp
+          paths:
+            - bash_env
 
   slack_notification:
     parallelism: 1
     executor: codepush_executor
     steps:
+      - attach_workspace:
+          at: /var/tmp/
+
+      - run: cat /var/tmp/bash_env >> $BASH_ENV
+
       - notify_slack_if_deploy_succeeded:
           environment: "staging"
           git_deploy_sha_begin: $GIT_DEPLOY_SHA_BEGIN
           git_deploy_sha_end: $GIT_DEPLOY_SHA_END
           git_deployed_diff: $GIT_DEPLOYED_DIFF
+      - run: echo $BASH_ENV
+      - run: echo $GIT_ATTRIBUTION
+      - run: echo $OTHER_JOB
 
 workflows:
   voom:
